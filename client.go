@@ -113,11 +113,11 @@ func newClient() (*client, error) {
 	// Create a IPv4 listener
 	uconn4, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4zero, Port: 0})
 	if err != nil {
-		log.Printf("[ERR] mdns: Failed to bind to udp4 port: %v", err)
+		//log.Printf("[ERR] mdns: Failed to bind to udp4 port: %v", err)
 	}
 	uconn6, err := net.ListenUDP("udp6", &net.UDPAddr{IP: net.IPv6zero, Port: 0})
 	if err != nil {
-		log.Printf("[ERR] mdns: Failed to bind to udp6 port: %v", err)
+		//log.Printf("[ERR] mdns: Failed to bind to udp6 port: %v", err)
 	}
 
 	if uconn4 == nil && uconn6 == nil {
@@ -126,11 +126,11 @@ func newClient() (*client, error) {
 
 	mconn4, err := net.ListenMulticastUDP("udp4", nil, ipv4Addr)
 	if err != nil {
-		log.Printf("[ERR] mdns: Failed to bind to udp4 port: %v", err)
+		//log.Printf("[ERR] mdns: Failed to bind to udp4 port: %v", err)
 	}
 	mconn6, err := net.ListenMulticastUDP("udp6", nil, ipv6Addr)
 	if err != nil {
-		log.Printf("[ERR] mdns: Failed to bind to udp6 port: %v", err)
+		//log.Printf("[ERR] mdns: Failed to bind to udp6 port: %v", err)
 	}
 
 	if mconn4 == nil && mconn6 == nil {
@@ -157,7 +157,6 @@ func (c *client) Close() error {
 	}
 	c.closed = true
 
-	log.Printf("[INFO] mdns: Closing client %v", *c)
 	close(c.closedCh)
 
 	if c.ipv4UnicastConn != nil {
