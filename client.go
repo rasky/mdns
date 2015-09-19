@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/miekg/dns"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
-	"github.com/miekg/dns"
 )
 
 // ServiceEntry is returned after we query for a service
@@ -65,13 +65,6 @@ func Query(params *QueryParam) error {
 		return err
 	}
 	defer client.Close()
-
-	// Set the multicast interface
-	if params.Interface != nil {
-		if err := client.setInterface(params.Interface); err != nil {
-			return err
-		}
-	}
 
 	// Ensure defaults are set
 	if params.Domain == "" {
@@ -222,7 +215,7 @@ func (c *client) query(params *QueryParam) error {
 		m.Question[0].Qclass |= 1 << 15
 	}
 	m.RecursionDesired = false
-	if err := c.sendQuery(m); err != nil {
+	if err := c.sendQuery(m, params.Interface); err != nil {
 		return err
 	}
 
@@ -292,7 +285,7 @@ func (c *client) query(params *QueryParam) error {
 				m := new(dns.Msg)
 				m.SetQuestion(inp.Name, dns.TypePTR)
 				m.RecursionDesired = false
-				if err := c.sendQuery(m); err != nil {
+				if err := c.sendQuery(m, params.Interface); err != nil {
 					log.Printf("[ERR] mdns: Failed to query instance %s: %v", inp.Name, err)
 				}
 			}
@@ -303,16 +296,24 @@ func (c *client) query(params *QueryParam) error {
 }
 
 // sendQuery is used to multicast a query out
-func (c *client) sendQuery(q *dns.Msg) error {
+func (c *client) sendQuery(q *dns.Msg, iface *net.Interface) error {
 	buf, err := q.Pack()
 	if err != nil {
 		return err
 	}
 	if c.ipv4UnicastConn != nil {
-		c.ipv4UnicastConn.WriteToUDP(buf, ipv4Addr)
+		p := ipv4.NewPacketConn(c.ipv4UnicastConn)
+		if iface != nil {
+			p.SetMulticastInterface(iface)
+		}
+		p.WriteTo(buf, nil, ipv4Addr)
 	}
 	if c.ipv6UnicastConn != nil {
-		c.ipv6UnicastConn.WriteToUDP(buf, ipv6Addr)
+		p := ipv6.NewPacketConn(c.ipv6UnicastConn)
+		if iface != nil {
+			p.SetMulticastInterface(iface)
+		}
+		p.WriteTo(buf, nil, ipv6Addr)
 	}
 	return nil
 }
@@ -326,7 +327,7 @@ func (c *client) recv(l *net.UDPConn, msgCh chan *dns.Msg) {
 	for !c.closed {
 		n, err := l.Read(buf)
 		if err != nil {
-			log.Printf("[ERR] mdns: Failed to read packet: %v", err)
+			// log.Printf("[ERR] mdns: Failed to read packet: %v", err)
 			continue
 		}
 		msg := new(dns.Msg)
