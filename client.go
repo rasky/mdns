@@ -218,6 +218,8 @@ func (c *client) query(params *QueryParam) error {
 	if err := c.sendQuery(m, params.Interface); err != nil {
 		return err
 	}
+	requested := make(map[uint16]bool)
+	requested[m.Id] = true
 
 	// Map the in-progress responses
 	inprogress := make(map[string]*ServiceEntry)
@@ -228,8 +230,13 @@ func (c *client) query(params *QueryParam) error {
 		select {
 		case resp := <-msgCh:
 			var inp *ServiceEntry
+			// Check that response is to a query we made, and not a forged
+			// packet (or a packet meant for a different resolver that was
+			// using this port)
+			if _, ok := requested[resp.Id]; !ok {
+				continue
+			}
 			for _, answer := range append(resp.Answer, resp.Extra...) {
-				// TODO(reddaly): Check that response corresponds to serviceAddr?
 				switch rr := answer.(type) {
 				case *dns.PTR:
 					// Create new entry for this
@@ -288,6 +295,7 @@ func (c *client) query(params *QueryParam) error {
 				if err := c.sendQuery(m, params.Interface); err != nil {
 					log.Printf("[ERR] mdns: Failed to query instance %s: %v", inp.Name, err)
 				}
+				requested[m.Id] = true
 			}
 		case <-finish:
 			return nil
